@@ -1,3 +1,4 @@
+from ast import parse
 import json
 import requests
 import subprocess
@@ -17,7 +18,7 @@ import json
 import stumpy
 
 
-spotifyToken = "BQD47TzeQFxTmn6C0c2xEMi9SzNiu0dvDuBLFBpCP722vhi_xN7BKlGP-aU3vJi9RSZwYhjJQz-2g2-LeyHarSR07DwmlFnENsjSXbNjWhOSxL6kG9TreN7NUB91OGItknU-UdDlnclnIhGBitH9Zzu6DS8305Myu11yS5E0sMbxM58y"
+spotifyToken = "BQBDm_LUCXTafFmXgBwbKQd6_zDCWq0PUZ8z5oy5TbSdaiQ0YS9Fp48ThL4o0hGN7WJkvBoJj1nSYygGrCxo7IKYD7XqRz8KYvPlOfaYMVi1FzinQCnAsCXPL-rc5-LV4u0BXH6OYfkuRuClg1ZSCwqMnYRn1j_n10Rdtvl0M2-3AvNT"
 
 def kmeans(songArtistName):
 
@@ -292,6 +293,128 @@ def stumpymodel(songArtistName):
 
 ####################################
 
+def stumpymodel_internet(songArtistName):
+
+    params = {
+        'q': songArtistName,
+        'type': 'track',
+        'limit': '2',
+        'market': 'US',
+    }
+
+    headers = {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + str(spotifyToken),
+    }
+
+    spotifySearchResponse = requests.get('https://api.spotify.com/v1/search', headers=headers, params=params)
+
+    #print(spotifySearchResponse.text)
+
+    spotifySearchJSON = json.loads(spotifySearchResponse.text)
+    print(spotifySearchJSON)
+
+    while 'error' in spotifySearchJSON:
+        print("Error: Trying again...")
+        time.sleep(1)
+        spotifySearchResponse = requests.get('https://api.spotify.com/v1/search', headers=headers, params=params)
+        #print(spotifySearchResponse.text)
+        spotifySearchJSON = json.loads(spotifySearchResponse.text)
+
+    #print(spotifySearchJSON['tracks']['items'][0]['id'])
+    songID = spotifySearchJSON['tracks']['items'][0]['id']
+    songNameAPI = spotifySearchJSON['tracks']['items'][0]['name']
+
+
+    url = 'https://api.spotify.com/v1/tracks/' + str(songID)
+    response = requests.get(url, headers=headers)
+    previewurl_json_response = response.json()
+    #print(previewurl_json_response)
+
+    while 'error' in previewurl_json_response:
+        print('Error: ')
+        time.sleep(1)
+        response = requests.get(url, headers=headers)
+        previewurl_json_response = response.json()
+        #print(previewurl_json_response)
+
+    strippedURL = previewurl_json_response['preview_url']
+    # Remove [:23] to get the actual filename
+    #strippedURL = strippedURL[30:]
+    #strippedURL = strippedURL.split('?', 1)[0]
+    print("\n---------------------------------------------\n")
+    print(strippedURL)
+
+    # If file already exists, don't download it again
+    if os.path.isfile(songNameAPI + ".mp3"):
+        print("File already exists")
+    else:
+        subprocess.run('wget ' + '\"' + str(strippedURL) + '\"' + ' -O ' + '\"' + songNameAPI + '.mp3' + '\"', shell=True)
+        time.sleep(1)
+
+    # Grab preview mp3 from spotify and point to this directory
+    # pattern, pattern_srate = librosa.load('our_data/'+data['preview_url'][index]+'.mp3', dtype=np.float64, sr=500)
+    pattern = librosa.load(songNameAPI+'.mp3', dtype=np.float64, sr=250)[0]
+    # samples = np.float64(samples)
+
+    samples_per_song = pattern.shape[0]
+    df_test = pd.read_csv('stumpy_250.csv')
+    
+    matches = stumpy.match(pattern, df_test['0'], max_matches=20)
+
+    most_sim = pd.DataFrame()
+    most_sim['distance'] = matches[:,0]
+    most_sim.index = np.rint(np.float64(matches[:,1]/samples_per_song)).astype(int)
+    most_sim = most_sim.groupby(most_sim.index, sort=False).first()
+
+    #print(most_sim.head(20))
+    print(most_sim)
+    chosenSong = most_sim.index[1]
+    print(chosenSong)
+
+    data = pd.read_csv('our_data/lyrical_data.csv')
+
+    print(data[data.index == chosenSong])
+
+    outputData = data[data.index == chosenSong].to_json(orient="records", lines=True)
+
+    parsed = json.loads(outputData)
+
+    # print song name
+    print(parsed['artist_name'])
+    print(parsed['track_name'])
+
+    # Remove downloaded mp3 file
+    print("\n---------------------------------------------\n")
+    print("Removing mp3 file..." + songNameAPI + ".mp3")
+    os.remove(songNameAPI + ".mp3")
+    print("\n---------------------------------------------\n")
+    time.sleep(1)
+
+
+    #songnameYoutube = parsed['artist_name'] + ' ' + parsed['track_name']
+
+    #SongMp3result = subprocess.run(["python3", "/usr/local/bin/yt-dlp", 'ytsearch:' + parsed['artist_name'] + ' - ' + parsed['track_name'] + ' Music', "-x", "--audio-format", "mp3", "-o", songNameAPI+'.mp3'], stdout=subprocess.PIPE)\
+    #    .stdout.decode("utf-8")
+    
+    subprocess.run(["python3", "/usr/local/bin/yt-dlp", 'ytsearch:' + parsed['artist_name'] + ' - ' + parsed['track_name'] + ' Music', "-x", "--audio-format", "mp3", "-o", parsed['artist_name'] + ' - ' + parsed['track_name'].replace(' ', '-')+'.mp3'])
+
+    #SongMp3result = json.loads(SongMp3result)
+
+    #print(SongMp3result)
+    
+    
+
+    os.replace(parsed['artist_name'] + ' - ' + parsed['track_name'].replace(' ', '-')+'.mp3', "/var/www/html/music/stumpy/"+parsed['artist_name'] + ' - ' + parsed['track_name'].replace(' ', '-')+'.mp3')
+
+    #parsed["url"] = SongMp3result["formats"][0]["url"]
+    parsed["url"] = 'http://192.99.5.117:9600/music/stumpy/'+parsed['artist_name'] + ' - ' + parsed['track_name'].replace(' ', '-')+'.mp3'
+
+    print(parsed)
+
+    return parsed
+
 
 app = Flask(__name__)
 @app.route('/')
@@ -327,6 +450,13 @@ def run_stumpy():
     songInput = request.args.get('songInput')
     if songInput != None:
         return stumpymodel(request.args.get('songInput'))
+
+
+@app.route('/stumpyinternet/', methods=['GET'])
+def run_stumpy_internet():
+    songInput = request.args.get('songInput')
+    if songInput != None:
+        return stumpymodel_internet(request.args.get('songInput'))
 
 app.run()
 
