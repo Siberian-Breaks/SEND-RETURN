@@ -30,3 +30,9 @@ SEND/RETURN is an entirely new way to experience music! It solves your song-sear
 
 3. If joining a public server >>
   Press `~` and type `open [IP]` to connect.
+  
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+![Flask values](https://raw.githubusercontent.com/Siberian-Breaks/SEND-RETURN/main/values.png "Flask values")
