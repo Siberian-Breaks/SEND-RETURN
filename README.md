@@ -4,6 +4,8 @@
 
 SEND/RETURN is an entirely new way to experience music! It solves your song-searching issues, from the comfort of a uniquely generated virtual environment. This enables multiple users to discover similar-sounding songs together.
 
+[Quick start guide](https://github.com/Siberian-Breaks/SEND-RETURN/blob/main/quick-start-guide.pdf)
+
 ## Hosting a local (LAN) server:
 1. Clone our repo and `cd ./flask-server/`
 2. Create a virtual environment with `python3 -m venv [venv-name]`
